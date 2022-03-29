@@ -7,17 +7,7 @@ namespace BankDumper
     {
         static void Main(string[] args)
         {
-            if (args.Length == 0)
-            {
-                Console.WriteLine();
-                Console.WriteLine(" " + AppDomain.CurrentDomain.FriendlyName + " <input bank> <output fsb>");
-            }
-            else if (args.Length == 1)
-            {
-                Console.WriteLine();
-                Console.WriteLine(" " + AppDomain.CurrentDomain.FriendlyName + " <input bank> <output fsb>");
-            }
-            else if (args.Length == 2)
+            if (args.Length == 2)
             {
                 byte[] infile = File.ReadAllBytes(args[0]);
 
