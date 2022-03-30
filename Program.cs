@@ -21,7 +21,7 @@ namespace BankDumper
 
                     string buffer = infile[i].ToString() + infile[i + 1].ToString() + infile[i + 2].ToString() + infile[i + 3].ToString();
 
-                    for (int n = 0; n<=2; n++)
+                    for (int n = 0; n <= 2; n++)
                     {
                         if (buffer == MagicNumber[n])
 
