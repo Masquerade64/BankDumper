@@ -1,76 +1,158 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Collections.Generic;
 
 namespace BankDumper
 {
     internal class Program
     {
-        static async Task Main(string[] args) 
+        static void Main(string[] args)
         {
-            if (args.Length == 2)
+            Console.Clear();
+            Console.Title = "Bank Dumping Tool | BDT";
+
+            if (args.Length == 3)  // Syntax : BDT <infile> <outfile> [.ext]
+
             {
 
-                var fsinfile = File.Open(args[0], FileMode.Open, FileAccess.Read);   // Input File
+                List<int> position = new List<int>(); // Used to store starting offset/position
+                byte[] infile = File.ReadAllBytes(args[0]);
 
-                byte[] buffer = new byte[fsinfile.Length]; 
-               
-                
-                // Main Loop : Using integer 'i' as an index for arrays and a position finder for I/O streams. 
-                for (int i = 0; i < fsinfile.Length; i++)
+                FileExistCheck(args); // Checks whether <output_path> is a directory or a file
+
+                for (int i = 0; i < infile.Length - 4; i++)
 
                 {
-                    
-                    // Nested Loop : To collect all 4-Byte pattern and store each Byte as 'n' index of buffer array
-                    for (int n = 0; n < fsinfile.Length; n++)
-                    {
-                        fsinfile.Seek(n, SeekOrigin.Begin);
-                        buffer[n] = Convert.ToByte(fsinfile.ReadByte()); // GetString Method takes array of bytes as input so "Convert.ToByte" was used.
-                    }
 
-                    string headerType = Encoding.ASCII.GetString(buffer[i..(i + 4)]);
-
-                    if (headerType == "BKHD" || headerType == "AKPK" || headerType == "FSB5")
-
-                    {
-                        Console.Clear();
-
-                        if (i == 0)
-
-                        {
-
-                            Console.WriteLine("{0} is already a dumped bank", args[0]);
-                            await Task.Delay(2000); 
-                            Environment.Exit(1);
-                        }
-
-
-                        var fsoutfile = File.Open(args[1], FileMode.Create, FileAccess.Write); // Output File
-
-                        
-
-                        Console.WriteLine("Header Detected Type => " + headerType);
-
-                        fsinfile.Seek(i, SeekOrigin.Begin); // This sets the new position, from where fsinfile copies to output.
-                        fsinfile.CopyTo(fsoutfile);
-
-
-                        fsoutfile.Flush();
-
-
-                        break;
-                    }
+                    string headerType = Encoding.ASCII.GetString(infile[i..(i + 4)]);
+                    HeaderCheck(headerType, i, position);
 
                 }
+
+                // End position = Length of the file, so should be the last element of 'position' List.
+                position.Add(infile.Length);
+
+
+                DirectoryCheck(args); // Checks whether <output_path> exists
+
+                Extracting(position, infile, args);
+
+                Credits();
+
+            }
+
+            else if (args.Length == 2)   // Syntax : BDT <infile> <outfile> 
+
+            {
+
+                List<int> position = new List<int>();  // Used to store starting offset/position
+                byte[] infile = File.ReadAllBytes(args[0]);
+
+                FileExistCheck(args); // Checks whether <output_path> is a directory or a file
+
+                for (int i = 0; i < infile.Length - 4; i++)
+
+                {
+
+                    string headerType = Encoding.ASCII.GetString(infile[i..(i + 4)]);
+                    HeaderCheck(headerType, i, position);
+
+                }
+
+                // End position = Length of the file, so should be the last element of 'position' List.
+                position.Add(infile.Length);
+                
+                
+                DirectoryCheck(args); // Checks whether <output_path> exists
+
+                for (int k = 1; k < position.Count; k++)
+
+                {
+                    int length = position[k] - position[k - 1];
+                    byte[] outfile = new byte[length];
+                    Array.Copy(infile, position[k - 1], outfile, 0, length);
+                    File.WriteAllBytes(args[1] + @"\" + k + ".dat", outfile);
+                    Console.WriteLine("->>> " + (k - 1) + ".dat" + " of length " + length + " ...... Extracted!");
+
+                }
+
+                Credits();
             }
 
             else
 
             {
                 Console.WriteLine();
-                Console.WriteLine(" " + AppDomain.CurrentDomain.FriendlyName + " <input bank> <output bank>");  // Syntax
+                Console.WriteLine(AppDomain.CurrentDomain.FriendlyName + " <input_bank> <output_directory>"); 
+                Credits();
+            }
+
+        }
+
+
+        static void Extracting(List<int> position, byte[] infile, string[] args)
+
+        {
+            for (int k = 1; k < position.Count; k++)
+
+            {
+                int length = position[k] - position[k - 1];
+                byte[] outfile = new byte[length];
+                Array.Copy(infile, position[k - 1], outfile, 0, length);
+                File.WriteAllBytes(args[1] + @"\" + k + args[2], outfile);
+                Console.WriteLine("->>> " + (k - 1) + args[2] + " of length " + length + " ...... Extracted!");
+
+            }
+        }
+
+        static void Credits()
+
+        {
+
+            Console.WriteLine();
+            Console.WriteLine("Masquerade | :(Sad8669");
+            Console.WriteLine();
+
+        }
+
+        static void HeaderCheck(string headerType, int i,List<int> position)
+
+        {
+
+            if (headerType == "BKHD" || headerType == "AKPK" || headerType == "FSB5")
+
+            {
+                Console.WriteLine("->" + headerType + " Header found at offset(d): " + i);
+                position.Add(i);
+
+            }
+
+        }
+
+        static void DirectoryCheck(string[] args)
+
+        {
+            if (!Directory.Exists(args[1]))
+
+            {
+                Directory.CreateDirectory(args[1]);
+            }
+
+        }
+
+        static void FileExistCheck(string[] args)
+
+        {
+
+            if (File.Exists(args[1]))  
+
+            {
+                Console.WriteLine("Output path is not in correct format!");
+                Environment.Exit(1);
             }
 
         }
     }
+
 }
