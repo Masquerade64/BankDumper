@@ -1,158 +1,157 @@
 using System;
 using System.IO;
-using System.Text;
 using System.Collections.Generic;
+using System.Diagnostics;
 
-namespace BankDumper
+namespace BankDumperTool
 {
     internal class Program
     {
         static void Main(string[] args)
         {
+
+
             Console.Clear();
-            Console.Title = "Bank Dumping Tool | BDT";
-
-            if (args.Length == 3)  // Syntax : BDT <infile> <outfile> [.ext]
-
-            {
-
-                List<int> position = new List<int>(); // Used to store starting offset/position
-                byte[] infile = File.ReadAllBytes(args[0]);
-
-                FileExistCheck(args); // Checks whether <output_path> is a directory or a file
-
-                for (int i = 0; i < infile.Length - 4; i++)
-
-                {
-
-                    string headerType = Encoding.ASCII.GetString(infile[i..(i + 4)]);
-                    HeaderCheck(headerType, i, position);
-
-                }
-
-                // End position = Length of the file, so should be the last element of 'position' List.
-                position.Add(infile.Length);
+            Console.Title = "BDT";
 
 
-                DirectoryCheck(args); // Checks whether <output_path> exists
-
-                Extracting(position, infile, args);
-
-                Credits();
-
-            }
-
-            else if (args.Length == 2)   // Syntax : BDT <infile> <outfile> 
+            if (args.Length != 2)
 
             {
-
-                List<int> position = new List<int>();  // Used to store starting offset/position
-                byte[] infile = File.ReadAllBytes(args[0]);
-
-                FileExistCheck(args); // Checks whether <output_path> is a directory or a file
-
-                for (int i = 0; i < infile.Length - 4; i++)
-
-                {
-
-                    string headerType = Encoding.ASCII.GetString(infile[i..(i + 4)]);
-                    HeaderCheck(headerType, i, position);
-
-                }
-
-                // End position = Length of the file, so should be the last element of 'position' List.
-                position.Add(infile.Length);
-                
-                
-                DirectoryCheck(args); // Checks whether <output_path> exists
-
-                for (int k = 1; k < position.Count; k++)
-
-                {
-                    int length = position[k] - position[k - 1];
-                    byte[] outfile = new byte[length];
-                    Array.Copy(infile, position[k - 1], outfile, 0, length);
-                    File.WriteAllBytes(args[1] + @"\" + k + ".dat", outfile);
-                    Console.WriteLine("->>> " + (k - 1) + ".dat" + " of length " + length + " ...... Extracted!");
-
-                }
-
-                Credits();
-            }
-
-            else
-
-            {
-                Console.WriteLine();
-                Console.WriteLine(AppDomain.CurrentDomain.FriendlyName + " <input_bank> <output_directory>"); 
-                Credits();
-            }
-
-        }
-
-
-        static void Extracting(List<int> position, byte[] infile, string[] args)
-
-        {
-            for (int k = 1; k < position.Count; k++)
-
-            {
-                int length = position[k] - position[k - 1];
-                byte[] outfile = new byte[length];
-                Array.Copy(infile, position[k - 1], outfile, 0, length);
-                File.WriteAllBytes(args[1] + @"\" + k + args[2], outfile);
-                Console.WriteLine("->>> " + (k - 1) + args[2] + " of length " + length + " ...... Extracted!");
-
-            }
-        }
-
-        static void Credits()
-
-        {
-
-            Console.WriteLine();
-            Console.WriteLine("Masquerade | :(Sad8669");
-            Console.WriteLine();
-
-        }
-
-        static void HeaderCheck(string headerType, int i,List<int> position)
-
-        {
-
-            if (headerType == "BKHD" || headerType == "AKPK" || headerType == "FSB5")
-
-            {
-                Console.WriteLine("->" + headerType + " Header found at offset(d): " + i);
-                position.Add(i);
-
-            }
-
-        }
-
-        static void DirectoryCheck(string[] args)
-
-        {
-            if (!Directory.Exists(args[1]))
-
-            {
-                Directory.CreateDirectory(args[1]);
-            }
-
-        }
-
-        static void FileExistCheck(string[] args)
-
-        {
-
-            if (File.Exists(args[1]))  
-
-            {
-                Console.WriteLine("Output path is not in correct format!");
+                IOMethods.Usage();
                 Environment.Exit(1);
             }
 
-        }
-    }
+            // Instance of Stopwatch Class, to measure the performance of the whole process.
+            Stopwatch timeCounter = new Stopwatch();
 
+
+            // Checks whether input file exist or not, if not, the program will exit.
+            IOMethods.FileExistCheck(args);
+            // Checks whether output path exist or not, if not, then it creates the path
+            IOMethods.DirectoryExistCheck(args);
+
+
+            // Input File
+            var bigStream = File.Open(args[0], FileMode.Open, FileAccess.Read);
+
+
+            // Variables and Magic Numbers //
+            // ---------------------------------------------- //
+            int currentByte;
+            byte[] buffer = new byte[4]; // Sliding Window
+            byte[] wwiseBKHD = { 66, 75, 72, 68 };  // BKHD
+            byte[] wwiseAKPK = { 65, 75, 80, 75 };  // AKPK
+            byte[] fmodFSB5 = { 70, 83, 66, 53 };  // BKHD
+            // ---------------------------------------------- //
+
+
+            // To save streams position
+            List<long> position = new List<long>();
+
+            // Starts ticking
+            timeCounter.Start();
+
+
+
+            while ((currentByte = bigStream.ReadByte()) != -1)
+
+            {
+
+                for (int i = 0; i < (buffer.Length - 1); i++)
+
+                {
+
+
+                    buffer[i] = buffer[i + 1];
+                }
+
+                buffer[(buffer.Length - 1)] = (byte)currentByte;
+
+
+                if (IOMethods.HeaderEquals(buffer, wwiseAKPK) || IOMethods.HeaderEquals(buffer, wwiseBKHD) || IOMethods.HeaderEquals(buffer, fmodFSB5))
+
+                {
+                    if (IOMethods.IsBKHD(buffer))
+
+                    {
+                        Console.WriteLine("-> BKHD Header Detected at offset(d): " + (bigStream.Position - buffer.Length));
+                    }
+
+                    else if (IOMethods.IsAKPK(buffer))
+
+                    {
+                        Console.WriteLine("-> AKPK Header Detected at offset(d): " + (bigStream.Position - buffer.Length));
+                    }
+
+                    else
+
+                    {
+                        Console.WriteLine("-> FSB5 Header Detected at offset(d): " + (bigStream.Position - buffer.Length));
+                    }
+
+                    position.Add(bigStream.Position - buffer.Length);
+                }
+
+            }
+
+            // Checks if any header was detected or not
+            IOMethods.NoHeadersCaseCheck(position,args);
+
+
+            // You will need length as last element element to extract them correctly.
+            position.Add(bigStream.Length);
+
+            // Closes the current stream, so that it can be read again by infile variable
+            bigStream.Close();
+
+            // The same algorithm used for extraction
+            byte[] infile = File.ReadAllBytes(args[0]);
+
+            for (int k = 1; k < position.Count; k++)
+
+            {
+                long length = position[k] - position[k - 1];
+                byte[] outfile = new byte[length];
+                Array.Copy(infile, position[k - 1], outfile, 0, length);
+
+
+                if (IOMethods.IsBKHD(outfile))
+
+                {
+                    File.WriteAllBytes(args[1] + @"\" + k + ".bnk", outfile);
+                }
+
+
+                else if (IOMethods.IsAKPK(outfile))
+
+                {
+                    File.WriteAllBytes(args[1] + @"\" + k + ".pck", outfile);
+                }
+
+                else
+
+                {
+                    File.WriteAllBytes(args[1] + @"\" + k + ".fsb", outfile);
+                }
+
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("File: " + Path.GetFileName(args[0]) + k + "| Status: Extracted! | Length: " + length);
+                Console.ResetColor();
+
+            }
+
+
+            // Stops Ticking
+            timeCounter.Stop();
+
+            // Displays time taken during the whole process.
+            Console.WriteLine("This process took " + timeCounter.ElapsedMilliseconds / 1000.0 + " seconds!");
+
+            Console.WriteLine();
+            Console.WriteLine("Masquerade | :( Sad8669 | insomnyawolf");
+
+        }
+
+    }
 }
